@@ -78,7 +78,7 @@ func listManagedInstances(sess *session.Session) []instance {
 	AllInstances := listAllInstances(sess)
 
 	client := ssm.New(sess)
-	input := &ssm.DescribeInstanceInformationInput{}
+	input := &ssm.DescribeInstanceInformationInput{MaxResults: aws.Int64(50)}
 	info, err := client.DescribeInstanceInformation(input)
 	if err != nil {
 		log.Println(err)
