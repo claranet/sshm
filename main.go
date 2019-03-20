@@ -3,8 +3,10 @@ package main
 import (
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
+	"strconv"
 	"strings"
 	"syscall"
 
@@ -79,23 +81,29 @@ func listManagedInstances(sess *session.Session) []instance {
 
 	client := ssm.New(sess)
 	input := &ssm.DescribeInstanceInformationInput{MaxResults: aws.Int64(50)}
-	info, err := client.DescribeInstanceInformation(input)
-	if err != nil {
-		log.Println(err)
-	}
 	var instances []instance
-	for _, i := range info.InstanceInformationList {
-		var e instance
-		e.InstanceId = *i.InstanceId
-		e.ComputerName = *i.ComputerName
-		e.Name = "unnamed"
-		for _, j := range AllInstances {
-			if *i.InstanceId == j.InstanceId {
-				e.Name = j.Name
-			}
+	for {
+		info, err := client.DescribeInstanceInformation(input)
+		if err != nil {
+			log.Println(err)
 		}
-		e.IPAddress = *i.IPAddress
-		instances = append(instances, e)
+		for _, i := range info.InstanceInformationList {
+			var e instance
+			e.InstanceId = *i.InstanceId
+			e.ComputerName = *i.ComputerName
+			e.Name = "unnamed"
+			for _, j := range AllInstances {
+				if *i.InstanceId == j.InstanceId {
+					e.Name = j.Name
+				}
+			}
+			e.IPAddress = *i.IPAddress
+			instances = append(instances, e)
+		}
+		if info.NextToken == nil {
+			break
+		}
+		input.SetNextToken(*info.NextToken)
 	}
 	return instances
 }
@@ -116,7 +124,7 @@ func selectInstance(instances []instance) string {
 	}
 
 	prompt := promptui.Select{
-		Label:             "",
+		Label:             strconv.Itoa(len(instances)) + " instances found",
 		Items:             instances,
 		Templates:         templates,
 		Size:              10,
@@ -127,9 +135,8 @@ func selectInstance(instances []instance) string {
 	}
 
 	selected, _, err := prompt.Run()
-
 	if err != nil {
-		// fmt.Printf("Prompt failed %v\n", err)
+		fmt.Printf("Prompt failed %v\n", err)
 		return ""
 	}
 
@@ -144,7 +151,7 @@ func startSSH(instanceId string, region, profile *string, sess *session.Session)
 	if err != nil {
 		log.Println(err)
 	}
-	// fmt.Println(ssmSess)
+	fmt.Println(ssmSess)
 	json, _ := json.Marshal(ssmSess)
 
 	cmd := exec.Command("session-manager-plugin", string(json), *region, "StartSession", *profile)
