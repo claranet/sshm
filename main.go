@@ -26,7 +26,11 @@ type instance struct {
 	ComputerName string
 	IPAddress    string
 	Name         string
+	AgentSSM     bool
 }
+
+var allInstances []instance
+var managedInstances []instance
 
 func main() {
 	profile := flag.String("profile", "default", "Profile from ~/.aws/config")
@@ -41,7 +45,8 @@ func main() {
 		Config:                  aws.Config{Region: aws.String(*region)},
 	}))
 
-	managedInstances := listManagedInstances(sess)
+	allInstances = listAllInstances(sess)
+	managedInstances = listManagedInstances(sess)
 	if len(managedInstances) == 0 {
 		log.Fatal("No available instance")
 	}
@@ -77,8 +82,6 @@ func listAllInstances(sess *session.Session) []instance {
 }
 
 func listManagedInstances(sess *session.Session) []instance {
-	AllInstances := listAllInstances(sess)
-
 	client := ssm.New(sess)
 	input := &ssm.DescribeInstanceInformationInput{MaxResults: aws.Int64(50)}
 	var instances []instance
@@ -91,13 +94,12 @@ func listManagedInstances(sess *session.Session) []instance {
 			var e instance
 			e.InstanceId = *i.InstanceId
 			e.ComputerName = *i.ComputerName
-			e.Name = "unnamed"
-			for _, j := range AllInstances {
+			e.IPAddress = *i.IPAddress
+			for _, j := range allInstances {
 				if *i.InstanceId == j.InstanceId {
 					e.Name = j.Name
 				}
 			}
-			e.IPAddress = *i.IPAddress
 			instances = append(instances, e)
 		}
 		if info.NextToken == nil {
@@ -108,7 +110,7 @@ func listManagedInstances(sess *session.Session) []instance {
 	return instances
 }
 
-func selectInstance(instances []instance) string {
+func selectInstance(managedInstances []instance) string {
 	templates := &promptui.SelectTemplates{
 		Label:    "",
 		Active:   `{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " - " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " - " | cyan | bold }}{{ .InstanceId | cyan | bold }}{{ " - " | cyan | bold }}{{ .IPAddress | cyan | bold }}`,
@@ -116,7 +118,7 @@ func selectInstance(instances []instance) string {
 	}
 
 	searcher := func(input string, index int) bool {
-		j := instances[index]
+		j := managedInstances[index]
 		name := strings.Replace(strings.ToLower(j.Name+j.ComputerName+j.InstanceId+j.IPAddress), " ", "", -1)
 		input = strings.Replace(strings.ToLower(input), " ", "", -1)
 
@@ -124,8 +126,8 @@ func selectInstance(instances []instance) string {
 	}
 
 	prompt := promptui.Select{
-		Label:             strconv.Itoa(len(instances)) + " instances found",
-		Items:             instances,
+		Label:             strconv.Itoa(len(managedInstances)) + "/" + strconv.Itoa(len(allInstances)) + " instances",
+		Items:             managedInstances,
 		Templates:         templates,
 		Size:              10,
 		Searcher:          searcher,
@@ -136,11 +138,10 @@ func selectInstance(instances []instance) string {
 
 	selected, _, err := prompt.Run()
 	if err != nil {
-		fmt.Printf("Prompt failed %v\n", err)
 		return ""
 	}
 
-	return instances[selected].InstanceId
+	return managedInstances[selected].InstanceId
 }
 
 func startSSH(instanceId string, region, profile *string, sess *session.Session) {
