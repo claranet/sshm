@@ -124,8 +124,8 @@ func listManagedInstances(sess *session.Session) []instance {
 func selectInstance(managedInstances []instance) string {
 	templates := &promptui.SelectTemplates{
 		// Label:    ``,
-		Active:   `{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " - " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " - " | cyan | bold }}{{ .InstanceId | cyan | bold }}{{ " - " | cyan | bold }}{{ .PrivateIpAddress | cyan | bold }}`,
-		Inactive: `  {{ .Name }}{{ " - " }}{{ .ComputerName }}{{ " - " }}{{ .InstanceId }}{{ " - " }}{{ .PrivateIpAddress }}`,
+		Active:   `{{ if eq .State "Online" }}{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " - " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " - " | cyan | bold }}{{ .InstanceId | cyan | bold }}{{ " - " | cyan | bold }}{{ .PrivateIpAddress | cyan | bold }}{{ else }}{{ "> " | red | bold }}{{ .Name | red | bold }}{{ " - " | red | bold }}{{ .ComputerName | red | bold }}{{ " - " | red | bold }}{{ .InstanceId | red | bold }}{{ " - " | red | bold }}{{ .PrivateIpAddress | red | bold }}{{ end }}`,
+		Inactive: `  {{ if eq .State "Online" }}{{ .Name }}{{ " - " }}{{ .ComputerName }}{{ " - " }}{{ .InstanceId }}{{ " - " }}{{ .PrivateIpAddress }}{{ else }}{{ .Name | red }}{{ " - "  | red }}{{ .ComputerName | red }}{{ " - " | red}}{{ .InstanceId | red }}{{ " - " | red }}{{ .PrivateIpAddress | red }}{{ end }}`,
 		Details: `
 {{ "PublicIP: " }}{{ .PublicIpAddress }}{{ " | Platform: " }}{{ .Platform }}{{ " | State: "}}{{ .State }}`,
 	}
