@@ -22,11 +22,13 @@ import (
 )
 
 type instance struct {
-	InstanceId   string
-	ComputerName string
-	IPAddress    string
-	Name         string
-	AgentSSM     bool
+	InstanceId       string
+	ComputerName     string
+	PrivateIpAddress string
+	PublicIpAddress  string
+	Name             string
+	State            string
+	Platform         string
 }
 
 var allInstances []instance
@@ -75,6 +77,20 @@ func listAllInstances(sess *session.Session) []instance {
 				}
 			}
 			e.InstanceId = *i.InstanceId
+			e.State = *i.State.Name
+			e.PublicIpAddress = "None"
+			if i.PublicIpAddress != nil {
+				e.PublicIpAddress = *i.PublicIpAddress
+			}
+			e.Platform = "Linux"
+			if i.Platform != nil {
+				switch *i.Platform {
+				case "windows":
+					e.Platform = "Windows"
+				case "Windows":
+					e.Platform = "Windows"
+				}
+			}
 			instances = append(instances, e)
 		}
 	}
@@ -94,10 +110,13 @@ func listManagedInstances(sess *session.Session) []instance {
 			var e instance
 			e.InstanceId = *i.InstanceId
 			e.ComputerName = *i.ComputerName
-			e.IPAddress = *i.IPAddress
+			e.PrivateIpAddress = *i.IPAddress
 			for _, j := range allInstances {
 				if *i.InstanceId == j.InstanceId {
 					e.Name = j.Name
+					e.PublicIpAddress = j.PublicIpAddress
+					e.Platform = j.Platform
+					e.State = j.State
 				}
 			}
 			instances = append(instances, e)
@@ -112,14 +131,16 @@ func listManagedInstances(sess *session.Session) []instance {
 
 func selectInstance(managedInstances []instance) string {
 	templates := &promptui.SelectTemplates{
-		Label:    "",
-		Active:   `{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " - " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " - " | cyan | bold }}{{ .InstanceId | cyan | bold }}{{ " - " | cyan | bold }}{{ .IPAddress | cyan | bold }}`,
-		Inactive: `  {{ .Name }} - {{ .ComputerName }} - {{ .InstanceId }} - {{ .IPAddress }}`,
+		// Label:    ``,
+		Active:   `{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " - " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " - " | cyan | bold }}{{ .InstanceId | cyan | bold }}{{ " - " | cyan | bold }}{{ .PrivateIpAddress | cyan | bold }}`,
+		Inactive: `  {{ .Name }}{{ " - " }}{{ .ComputerName }}{{ " - " }}{{ .InstanceId }}{{ " - " }}{{ .PrivateIpAddress }}`,
+		Details: `
+{{ "PublicIP: " }}{{ .PublicIpAddress }}{{ " | Platform: " }}{{ .Platform }}{{ " | State: "}}{{ .State }}`,
 	}
 
 	searcher := func(input string, index int) bool {
 		j := managedInstances[index]
-		name := strings.Replace(strings.ToLower(j.Name+j.ComputerName+j.InstanceId+j.IPAddress), " ", "", -1)
+		name := strings.Replace(strings.ToLower(j.Name+j.ComputerName+j.InstanceId+j.PrivateIpAddress), " ", "", -1)
 		input = strings.Replace(strings.ToLower(input), " ", "", -1)
 
 		return strings.Contains(name, input)
