@@ -81,16 +81,9 @@ func listAllInstances(sess *session.Session) []instance {
 			if i.PublicIpAddress != nil {
 				e.PublicIpAddress = *i.PublicIpAddress
 			}
-			e.Platform = "Linux"
-			if i.Platform != nil {
-				switch *i.Platform {
-				case "windows":
-					e.Platform = "Windows"
-				case "Windows":
-					e.Platform = "Windows"
-				}
+			if *i.State.Name == "running" {
+				instances = append(instances, e)
 			}
-			instances = append(instances, e)
 		}
 	}
 	return instances
@@ -103,19 +96,19 @@ func listManagedInstances(sess *session.Session) []instance {
 	for {
 		info, err := client.DescribeInstanceInformation(input)
 		if err != nil {
-			log.Println(err)
+			log.Println(err.Error())
 		}
 		for _, i := range info.InstanceInformationList {
 			var e instance
 			e.InstanceId = *i.InstanceId
 			e.ComputerName = *i.ComputerName
 			e.PrivateIpAddress = *i.IPAddress
+			e.Platform = *i.PlatformType
+			e.State = *i.PingStatus
 			for _, j := range allInstances {
 				if *i.InstanceId == j.InstanceId {
 					e.Name = j.Name
 					e.PublicIpAddress = j.PublicIpAddress
-					e.Platform = j.Platform
-					e.State = j.State
 				}
 			}
 			instances = append(instances, e)
@@ -170,7 +163,7 @@ func startSSH(instanceId string, region, profile *string, sess *session.Session)
 
 	ssmSess, err := client.StartSession(input)
 	if err != nil {
-		log.Println(err)
+		log.Fatal(err.Error())
 	}
 	json, _ := json.Marshal(ssmSess)
 
