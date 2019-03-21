@@ -3,7 +3,6 @@ package main
 import (
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"strconv"
@@ -173,7 +172,6 @@ func startSSH(instanceId string, region, profile *string, sess *session.Session)
 	if err != nil {
 		log.Println(err)
 	}
-	fmt.Println(ssmSess)
 	json, _ := json.Marshal(ssmSess)
 
 	cmd := exec.Command("session-manager-plugin", string(json), *region, "StartSession", *profile)
