@@ -26,8 +26,10 @@ type instance struct {
 	PrivateIpAddress string
 	PublicIpAddress  string
 	Name             string
-	State            string
-	Platform         string
+	InstanceState    string
+	AgentState       string
+	PlatformType     string
+	PlatformName     string
 }
 
 var allInstances []instance
@@ -76,12 +78,14 @@ func listAllInstances(sess *session.Session) []instance {
 				}
 			}
 			e.InstanceId = *i.InstanceId
-			e.State = *i.State.Name
+			e.InstanceState = *i.State.Name
 			e.PublicIpAddress = "None"
 			if i.PublicIpAddress != nil {
 				e.PublicIpAddress = *i.PublicIpAddress
+			} else {
+				e.PublicIpAddress = "N/A"
 			}
-			if *i.State.Name == "running" {
+			if *i.State.Name != "terminated" || *i.State.Name != "shutting-down" {
 				instances = append(instances, e)
 			}
 		}
@@ -103,12 +107,18 @@ func listManagedInstances(sess *session.Session) []instance {
 			e.InstanceId = *i.InstanceId
 			e.ComputerName = *i.ComputerName
 			e.PrivateIpAddress = *i.IPAddress
-			e.Platform = *i.PlatformType
-			e.State = *i.PingStatus
+			e.PlatformType = *i.PlatformType
+			e.PlatformName = *i.PlatformName + " " + *i.PlatformVersion
+			if *i.PingStatus != "Online" {
+				e.AgentState = "Offline"
+			} else {
+				e.AgentState = *i.PingStatus
+			}
 			for _, j := range allInstances {
 				if *i.InstanceId == j.InstanceId {
 					e.Name = j.Name
 					e.PublicIpAddress = j.PublicIpAddress
+					e.InstanceState = j.InstanceState
 				}
 			}
 			instances = append(instances, e)
@@ -124,22 +134,34 @@ func listManagedInstances(sess *session.Session) []instance {
 func selectInstance(managedInstances []instance) string {
 	templates := &promptui.SelectTemplates{
 		// Label:    ``,
-		Active:   `{{ if eq .State "Online" }}{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " - " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " - " | cyan | bold }}{{ .InstanceId | cyan | bold }}{{ " - " | cyan | bold }}{{ .PrivateIpAddress | cyan | bold }}{{ else }}{{ "> " | red | bold }}{{ .Name | red | bold }}{{ " - " | red | bold }}{{ .ComputerName | red | bold }}{{ " - " | red | bold }}{{ .InstanceId | red | bold }}{{ " - " | red | bold }}{{ .PrivateIpAddress | red | bold }}{{ end }}`,
-		Inactive: `  {{ if eq .State "Online" }}{{ .Name }}{{ " - " }}{{ .ComputerName }}{{ " - " }}{{ .InstanceId }}{{ " - " }}{{ .PrivateIpAddress }}{{ else }}{{ .Name | red }}{{ " - "  | red }}{{ .ComputerName | red }}{{ " - " | red}}{{ .InstanceId | red }}{{ " - " | red }}{{ .PrivateIpAddress | red }}{{ end }}`,
+		Active:   `{{ if eq .AgentState "Online" }}{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " - " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " - " | cyan | bold }}{{ .InstanceId | cyan | bold }}{{ " - " | cyan | bold }}{{ .PrivateIpAddress | cyan | bold }}{{ else }}{{ "> " | red | bold }}{{ .Name | red | bold }}{{ " - " | red | bold }}{{ .ComputerName | red | bold }}{{ " - " | red | bold }}{{ .InstanceId | red | bold }}{{ " - " | red | bold }}{{ .PrivateIpAddress | red | bold }}{{ end }}`,
+		Inactive: `  {{ if eq .AgentState "Online" }}{{ .Name }}{{ " - " }}{{ .ComputerName }}{{ " - " }}{{ .InstanceId }}{{ " - " }}{{ .PrivateIpAddress }}{{ else }}{{ .Name | red }}{{ " - "  | red }}{{ .ComputerName | red }}{{ " - " | red}}{{ .InstanceId | red }}{{ " - " | red }}{{ .PrivateIpAddress | red }}{{ end }}`,
 		Details: `
-{{ "PublicIP: " }}{{ .PublicIpAddress }}{{ " | Platform: " }}{{ .Platform }}{{ " | State: "}}{{ .State }}`,
+{{ "PublicIP: " }}{{ .PublicIpAddress }}{{ " | PlatformType: " }}{{ .PlatformType }}{{ " | PlatformName: " }}{{ .PlatformName }}{{ " | Agent: "}}{{ .AgentState }}{{ " | State: "}}{{ .InstanceState }}`,
 	}
 
 	searcher := func(input string, index int) bool {
 		j := managedInstances[index]
-		name := strings.Replace(strings.ToLower(j.Name+j.ComputerName+j.InstanceId+j.PrivateIpAddress), " ", "", -1)
+		name := strings.Replace(strings.ToLower(j.InstanceId+j.ComputerName+j.PrivateIpAddress+j.PublicIpAddress+j.Name+j.InstanceState+j.AgentState+j.PlatformType+j.PlatformName), " ", "", -1)
 		input = strings.Replace(strings.ToLower(input), " ", "", -1)
 
 		return strings.Contains(name, input)
 	}
 
+	var countRunning, countOnline int
+	for _, i := range allInstances {
+		if i.InstanceState == "running" {
+			countRunning++
+		}
+	}
+	for _, i := range managedInstances {
+		if i.AgentState == "Online" {
+			countOnline++
+		}
+	}
+
 	prompt := promptui.Select{
-		Label:             strconv.Itoa(len(managedInstances)) + "/" + strconv.Itoa(len(allInstances)) + " instances",
+		Label:             "Online: " + strconv.Itoa(countOnline) + " | Offline: " + strconv.Itoa(len(managedInstances)-countOnline) + " | Running: " + strconv.Itoa(countRunning) + " ",
 		Items:             managedInstances,
 		Templates:         templates,
 		Size:              10,
