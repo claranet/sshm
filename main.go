@@ -37,7 +37,7 @@ var managedInstances []instance
 
 func main() {
 	profile := flag.String("profile", "default", "Profile from ~/.aws/config")
-	region := flag.String("region (only to create session)", "eu-west-1", "Region")
+	region := flag.String("region", "eu-west-1", "Region (only to create session), default is eu-west-1")
 	flag.Parse()
 
 	// Create session (credentials from ~/.aws/config)
