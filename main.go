@@ -1,10 +1,13 @@
 package main
 
 import (
+	"bufio"
 	"encoding/json"
 	"flag"
 	"log"
 	"os"
+	"regexp"
+	"sort"
 	"strconv"
 	"strings"
 	"syscall"
@@ -36,9 +39,15 @@ var allInstances []instance
 var managedInstances []instance
 
 func main() {
-	profile := flag.String("profile", "default", "Profile from ~/.aws/config")
+	profile := flag.String("profile", "", "Profile from ~/.aws/config")
 	region := flag.String("region", "eu-west-1", "Region (only to create session), default is eu-west-1")
 	flag.Parse()
+
+	if *profile == "" {
+		p := listProfiles()
+		sort.Strings(p)
+		*profile = selectProfile(p)
+	}
 
 	// Create session (credentials from ~/.aws/config)
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
@@ -57,6 +66,63 @@ func main() {
 	if selected := selectInstance(managedInstances); selected != "" {
 		startSSH(selected, region, profile, sess)
 	}
+}
+
+func listProfiles() []string {
+	var profiles []string
+	file, err := os.Open(os.Getenv("HOME") + "/.aws/config")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer file.Close()
+
+	reg := regexp.MustCompile(`^\[profile `)
+
+	scanner := bufio.NewScanner(file)
+	for scanner.Scan() {
+		if t := reg.MatchString(scanner.Text()); t == true {
+			s := strings.TrimSuffix(reg.ReplaceAllString(scanner.Text(), "${1}"), "]")
+			profiles = append(profiles, s)
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatal(err)
+	}
+
+	return profiles
+}
+
+func selectProfile(profiles []string) string {
+	templates := &promptui.SelectTemplates{
+		// Label:    ``,
+		Active:   `{{ "> " | cyan | bold }}{{ . | cyan | bold }}`,
+		Inactive: `  {{ . }}`,
+	}
+
+	searcher := func(input string, index int) bool {
+		j := profiles[index]
+		name := strings.ToLower(j)
+		input = strings.ToLower(input)
+
+		return strings.Contains(name, input)
+	}
+
+	prompt := promptui.Select{
+		Label:             "Profile",
+		Items:             profiles,
+		Templates:         templates,
+		Size:              10,
+		Searcher:          searcher,
+		StartInSearchMode: true,
+	}
+
+	selected, _, err := prompt.Run()
+	if err != nil {
+		os.Exit(0)
+	}
+
+	return profiles[selected]
 }
 
 func listAllInstances(sess *session.Session) []instance {
@@ -85,7 +151,10 @@ func listAllInstances(sess *session.Session) []instance {
 			} else {
 				e.PublicIpAddress = "N/A"
 			}
-			if *i.State.Name != "terminated" || *i.State.Name != "shutting-down" {
+			switch *i.State.Name {
+			case "terminated", "shutting-down":
+			//
+			default:
 				instances = append(instances, e)
 			}
 		}
