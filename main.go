@@ -44,9 +44,15 @@ func main() {
 	flag.Parse()
 
 	if *profile == "" {
-		p := listProfiles()
-		sort.Strings(p)
-		*profile = selectProfile(p)
+		if os.Getenv("AWS_PROFILE") != "" {
+			*profile = os.Getenv("AWS_PROFILE")
+		} else if os.Getenv("AWS_DEFAULT_PROFILE") != "" {
+			*profile = os.Getenv("AWS_DEFAULT_PROFILE")
+		} else {
+			p := listProfiles()
+			sort.Strings(p)
+			*profile = selectProfile(p)
+		}
 	}
 
 	// Create session (credentials from ~/.aws/config)
@@ -236,7 +242,7 @@ func selectInstance(managedInstances []instance) string {
 		Size:              10,
 		Searcher:          searcher,
 		StartInSearchMode: true,
-		// HideSelected:      true,
+		HideSelected:      true,
 		// HideHelp:          true,
 	}
 
