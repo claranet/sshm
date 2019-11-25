@@ -188,14 +188,12 @@ func listManagedInstances(sess *session.Session) []instance {
 		for _, i := range info.InstanceInformationList {
 			var e instance
 			e.InstanceID = *i.InstanceId
-			e.ComputerName = *i.ComputerName
-			e.PrivateIPAddress = *i.IPAddress
-			e.PlatformType = *i.PlatformType
-			e.PlatformName = *i.PlatformName + " " + *i.PlatformVersion
-			if *i.PingStatus != "Online" {
-				e.AgentState = "Offline"
-			} else {
-				e.AgentState = *i.PingStatus
+			e.AgentState = *i.PingStatus
+			if *i.PingStatus == "Online" {
+				e.ComputerName = *i.ComputerName
+				e.PrivateIPAddress = *i.IPAddress
+				e.PlatformType = *i.PlatformType
+				e.PlatformName = *i.PlatformName + " " + *i.PlatformVersion
 			}
 			for _, j := range allInstances {
 				if *i.InstanceId == j.InstanceID {

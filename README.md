@@ -15,11 +15,13 @@ Install `session-manager-plugin` : https://docs.aws.amazon.com/systems-manager/l
 ## Usage
 
 ```bash
-Usage of sshm:
-    -profile string
-        Profile from ~/.aws/config (if empty, a list of your profiles is displayed)
-    -region string
-        Region (default "eu-west-1")
+Usage of ./sshm:
+  -i string
+        Instance-ID for direct connection
+  -p string
+        Profile from ~/.aws/config
+  -r string
+        Region (only to create session), default is eu-west-1 (default "eu-west-1")
 ```
 You can select your instance by &larr;, &uarr;, &rarr; &darr; and filter by *Tag:Name*, *InstanceId*, *Hostname*, *PrivateIp*, *PublicIp*, etc. **Enter** key to validate. 
 
