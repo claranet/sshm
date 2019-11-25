@@ -24,10 +24,10 @@ import (
 )
 
 type instance struct {
-	InstanceId       string
+	InstanceID       string
 	ComputerName     string
-	PrivateIpAddress string
-	PublicIpAddress  string
+	PrivateIPAddress string
+	PublicIPAddress  string
 	Name             string
 	InstanceState    string
 	AgentState       string
@@ -39,8 +39,9 @@ var allInstances []instance
 var managedInstances []instance
 
 func main() {
-	profile := flag.String("profile", "", "Profile from ~/.aws/config")
-	region := flag.String("region", "eu-west-1", "Region (only to create session), default is eu-west-1")
+	profile := flag.String("p", "", "Profile from ~/.aws/config")
+	region := flag.String("r", "eu-west-1", "Region, default is eu-west-1")
+	instance := flag.String("i", "", "InstanceID for direct connection")
 	flag.Parse()
 
 	if *profile == "" {
@@ -55,6 +56,10 @@ func main() {
 		}
 	}
 
+	if reg, present := os.LookupEnv("AWS_DEFAULT_REGION"); *region == "" && present == true {
+		*region = reg
+	}
+
 	// Create session (credentials from ~/.aws/config)
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState:       session.SharedConfigEnable,  //enable use of ~/.aws/config
@@ -63,14 +68,17 @@ func main() {
 		Config:                  aws.Config{Region: aws.String(*region)},
 	}))
 
-	allInstances = listAllInstances(sess)
-	managedInstances = listManagedInstances(sess)
-	if len(managedInstances) == 0 {
-		log.Fatal("No available instance")
-	}
-
-	if selected := selectInstance(managedInstances); selected != "" {
-		startSSH(selected, region, profile, sess)
+	if *instance != "" {
+		startSSH(*instance, region, profile, sess)
+	} else {
+		allInstances = listAllInstances(sess)
+		managedInstances = listManagedInstances(sess)
+		if len(managedInstances) == 0 {
+			log.Fatal("No available instance")
+		}
+		if selected := selectInstance(managedInstances); selected != "" {
+			startSSH(selected, region, profile, sess)
+		}
 	}
 }
 
@@ -149,13 +157,13 @@ func listAllInstances(sess *session.Session) []instance {
 					e.Name = *tag.Value
 				}
 			}
-			e.InstanceId = *i.InstanceId
+			e.InstanceID = *i.InstanceId
 			e.InstanceState = *i.State.Name
-			e.PublicIpAddress = "None"
+			e.PublicIPAddress = "None"
 			if i.PublicIpAddress != nil {
-				e.PublicIpAddress = *i.PublicIpAddress
+				e.PublicIPAddress = *i.PublicIpAddress
 			} else {
-				e.PublicIpAddress = "N/A"
+				e.PublicIPAddress = "N/A"
 			}
 			switch *i.State.Name {
 			case "terminated", "shutting-down":
@@ -179,9 +187,9 @@ func listManagedInstances(sess *session.Session) []instance {
 		}
 		for _, i := range info.InstanceInformationList {
 			var e instance
-			e.InstanceId = *i.InstanceId
+			e.InstanceID = *i.InstanceId
 			e.ComputerName = *i.ComputerName
-			e.PrivateIpAddress = *i.IPAddress
+			e.PrivateIPAddress = *i.IPAddress
 			e.PlatformType = *i.PlatformType
 			e.PlatformName = *i.PlatformName + " " + *i.PlatformVersion
 			if *i.PingStatus != "Online" {
@@ -190,9 +198,9 @@ func listManagedInstances(sess *session.Session) []instance {
 				e.AgentState = *i.PingStatus
 			}
 			for _, j := range allInstances {
-				if *i.InstanceId == j.InstanceId {
+				if *i.InstanceId == j.InstanceID {
 					e.Name = j.Name
-					e.PublicIpAddress = j.PublicIpAddress
+					e.PublicIPAddress = j.PublicIPAddress
 					e.InstanceState = j.InstanceState
 				}
 			}
@@ -207,17 +215,20 @@ func listManagedInstances(sess *session.Session) []instance {
 }
 
 func selectInstance(managedInstances []instance) string {
+
+	formattedInstancesList := getFormattedInstancesList(managedInstances)
+
 	templates := &promptui.SelectTemplates{
 		// Label:    ``,
-		Active:   `{{ if eq .AgentState "Online" }}{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " - " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " - " | cyan | bold }}{{ .InstanceId | cyan | bold }}{{ " - " | cyan | bold }}{{ .PrivateIpAddress | cyan | bold }}{{ else }}{{ "> " | red | bold }}{{ .Name | red | bold }}{{ " - " | red | bold }}{{ .ComputerName | red | bold }}{{ " - " | red | bold }}{{ .InstanceId | red | bold }}{{ " - " | red | bold }}{{ .PrivateIpAddress | red | bold }}{{ end }}`,
-		Inactive: `  {{ if eq .AgentState "Online" }}{{ .Name }}{{ " - " }}{{ .ComputerName }}{{ " - " }}{{ .InstanceId }}{{ " - " }}{{ .PrivateIpAddress }}{{ else }}{{ .Name | red }}{{ " - "  | red }}{{ .ComputerName | red }}{{ " - " | red}}{{ .InstanceId | red }}{{ " - " | red }}{{ .PrivateIpAddress | red }}{{ end }}`,
+		Active:   `{{ if eq .AgentState "Online" }}{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " | " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " | " | cyan | bold }}{{ .InstanceID | cyan | bold }}{{ " | " | cyan | bold }}{{ .PrivateIPAddress | cyan | bold }}{{ else }}{{ "> " | red | bold }}{{ .Name | red | bold }}{{ " | " | red | bold }}{{ .ComputerName | red | bold }}{{ " | " | red | bold }}{{ .InstanceID | red | bold }}{{ " | " | red | bold }}{{ .PrivateIPAddress | red | bold }}{{ end }}`,
+		Inactive: `  {{ if eq .AgentState "Online" }}{{ .Name }}{{ " | " }}{{ .ComputerName }}{{ " | " }}{{ .InstanceID }}{{ " | " }}{{ .PrivateIPAddress }}{{ else }}{{ .Name | red }}{{ " | "  | red }}{{ .ComputerName | red }}{{ " | " | red}}{{ .InstanceID | red }}{{ " | " | red }}{{ .PrivateIPAddress | red }}{{ end }}`,
 		Details: `
-{{ "PublicIP: " }}{{ .PublicIpAddress }}{{ " | PlatformType: " }}{{ .PlatformType }}{{ " | PlatformName: " }}{{ .PlatformName }}{{ " | Agent: "}}{{ .AgentState }}{{ " | State: "}}{{ .InstanceState }}`,
+{{ "PublicIP: " }}{{ .PublicIPAddress }}{{ " | PlatformType: " }}{{ .PlatformType }}{{ " | PlatformName: " }}{{ .PlatformName }}{{ " | Agent: "}}{{ .AgentState }}{{ " | State: "}}{{ .InstanceState }}`,
 	}
 
 	searcher := func(input string, index int) bool {
 		j := managedInstances[index]
-		name := strings.Replace(strings.ToLower(j.InstanceId+j.ComputerName+j.PrivateIpAddress+j.PublicIpAddress+j.Name+j.InstanceState+j.AgentState+j.PlatformType+j.PlatformName), " ", "", -1)
+		name := strings.Replace(strings.ToLower(j.InstanceID+j.ComputerName+j.PrivateIPAddress+j.PublicIPAddress+j.Name+j.InstanceState+j.AgentState+j.PlatformType+j.PlatformName), " ", "", -1)
 		input = strings.Replace(strings.ToLower(input), " ", "", -1)
 
 		return strings.Contains(name, input)
@@ -237,9 +248,9 @@ func selectInstance(managedInstances []instance) string {
 
 	prompt := promptui.Select{
 		Label:             "Online: " + strconv.Itoa(countOnline) + " | Offline: " + strconv.Itoa(len(managedInstances)-countOnline) + " | Running: " + strconv.Itoa(countRunning) + " ",
-		Items:             managedInstances,
+		Items:             formattedInstancesList,
 		Templates:         templates,
-		Size:              10,
+		Size:              15,
 		Searcher:          searcher,
 		StartInSearchMode: true,
 		HideSelected:      true,
@@ -251,12 +262,12 @@ func selectInstance(managedInstances []instance) string {
 		return ""
 	}
 
-	return managedInstances[selected].InstanceId
+	return managedInstances[selected].InstanceID
 }
 
-func startSSH(instanceId string, region, profile *string, sess *session.Session) {
+func startSSH(InstanceID string, region, profile *string, sess *session.Session) {
 	client := ssm.New(sess)
-	input := &ssm.StartSessionInput{Target: aws.String(instanceId)}
+	input := &ssm.StartSessionInput{Target: aws.String(InstanceID)}
 
 	ssmSess, err := client.StartSession(input)
 	if err != nil {
@@ -270,4 +281,45 @@ func startSSH(instanceId string, region, profile *string, sess *session.Session)
 	cmd.Stderr = os.Stderr
 	signal.Ignore(syscall.SIGINT)
 	cmd.Run()
+}
+
+func getFormattedInstancesList(managedInstances []instance) []instance {
+	var size1, size2, size3, size4 int
+	for _, i := range managedInstances {
+		if len(i.Name) > size1 {
+			size1 = len(i.Name)
+		}
+		if len(i.ComputerName) > size2 {
+			size2 = len(i.ComputerName)
+		}
+		if len(i.InstanceID) > size3 {
+			size3 = len(i.InstanceID)
+		}
+		if len(i.PrivateIPAddress) > size4 {
+			size4 = len(i.PrivateIPAddress)
+		}
+	}
+
+	var formattedInstancesList []instance
+	for _, i := range managedInstances {
+		var fi instance
+		fi.Name = addSpaces(i.Name, size1)
+		fi.ComputerName = addSpaces(i.ComputerName, size2)
+		fi.InstanceID = addSpaces(i.InstanceID, size3)
+		fi.PrivateIPAddress = addSpaces(i.PrivateIPAddress, size4)
+		fi.PublicIPAddress = i.PublicIPAddress
+		fi.InstanceState = i.InstanceState
+		fi.AgentState = i.AgentState
+		fi.PlatformType = i.PlatformType
+		fi.PlatformName = i.PlatformName
+		formattedInstancesList = append(formattedInstancesList, fi)
+	}
+	return formattedInstancesList
+}
+
+func addSpaces(text string, size int) string {
+	for i := 0; size-len(text) > 0; i++ {
+		text += " "
+	}
+	return text
 }
