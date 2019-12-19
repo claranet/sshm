@@ -2,7 +2,7 @@
 
 ## Description
 
-Easy connect on EC2 instances thanks to AWS System Manager Agent. Just use your `~/.aws/profile` to easily select the instance you want to connect on.
+Easy connect on EC2 instances thanks to AWS System Manager Agent. Just use your `~/.aws/profile` to easily select the instance you want to connect or on create a tunnel to.
 
 ## Why
 
@@ -10,31 +10,45 @@ Easy connect on EC2 instances thanks to AWS System Manager Agent. Just use your 
 
 ## Prerequisites
 
-Install `session-manager-plugin` : https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html
+Install `session-manager-plugin` : https://docs.aws.amazon.com/systems-manager/latest/userguide/session-manager-working-with-install-plugin.html (minimum version : **1.1.35.0**)
 
 ## Usage
 
 ```bash
-Usage of ./sshm:
+Usage of sshm:
   -i string
-        Instance-ID for direct connection
+        InstanceID for direct connection
+  -lpn string
+        Local Port Number for Proxy
   -p string
         Profile from ~/.aws/config
+  -pn string
+        Port Number for Proxy
   -r string
-        Region (only to create session), default is eu-west-1 (default "eu-west-1")
+        Region, default is eu-west-1 (default "eu-west-1")
 ```
-You can select your instance by &larr;, &uarr;, &rarr; &darr; and filter by *Tag:Name*, *InstanceId*, *Hostname*, *PrivateIp*, *PublicIp*, etc. **Enter** key to validate. 
+You can select your instance by &larr;, &uarr;, &rarr; &darr; and filter by *Tag:Name*, *InstanceId*, *Hostname*, *PrivateIp*, *PublicIp*, etc. **Enter** key to validate.
+
+If `-lpn` and `-pn` are specified, a tunnel is started :
+
+```bash
+$ sshm -lpn 9999 -pn 80
+ 
+...
+
+Starting session with SessionId: 1576756257508463700-0c3b74e1f450c5d5a
+Port 9999 opened for sessionId 1576756257508463700-0c3b74e1f450c5d5a.
+```
 
 Legend :
-* *Online* : all running instances with a SSM Agent connected
-* *Offline* : all instances with a SSM Agent disconnected (agent down or instance is stopped)
-* *Running* : all running instances with or without SSM Agent installed
+* **Online** : all running instances with a SSM Agent connected
+* **Offline** : all instances with a SSM Agent disconnected (agent down or instance is stopped)
+* **Running** : all running instances with or without SSM Agent installed
 
 ## Output Example
 
 ![screenshot1](./img/screenshot1.png)
 ![screenshot2](./img/screenshot2.png)
-![screenshot3](./img/screenshot3.png)
 
 ## Build
 

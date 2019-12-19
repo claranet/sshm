@@ -42,7 +42,12 @@ func main() {
 	profile := flag.String("p", "", "Profile from ~/.aws/config")
 	region := flag.String("r", "eu-west-1", "Region, default is eu-west-1")
 	instance := flag.String("i", "", "InstanceID for direct connection")
+	portNumber := flag.String("pn", "", "Port Number for Proxy")
+	localPortNumber := flag.String("lpn", "", "Local Port Number for Proxy")
 	flag.Parse()
+
+	source := flag.Arg(0)
+	destination := flag.Arg(1)
 
 	if *profile == "" {
 		if os.Getenv("AWS_PROFILE") != "" {
@@ -69,7 +74,7 @@ func main() {
 	}))
 
 	if *instance != "" {
-		startSSH(*instance, region, profile, sess)
+		startSSH(*instance, region, profile, portNumber, localPortNumber, source, destination, sess)
 	} else {
 		allInstances = listAllInstances(sess)
 		managedInstances = listManagedInstances(sess)
@@ -77,7 +82,7 @@ func main() {
 			log.Fatal("No available instance")
 		}
 		if selected := selectInstance(managedInstances); selected != "" {
-			startSSH(selected, region, profile, sess)
+			startSSH(selected, region, profile, portNumber, localPortNumber, source, destination, sess)
 		}
 	}
 }
@@ -221,7 +226,7 @@ func selectInstance(managedInstances []instance) string {
 		Active:   `{{ if eq .AgentState "Online" }}{{ "> " | cyan | bold }}{{ .Name | cyan | bold }}{{ " | " | cyan | bold }}{{ .ComputerName | cyan | bold }}{{ " | " | cyan | bold }}{{ .InstanceID | cyan | bold }}{{ " | " | cyan | bold }}{{ .PrivateIPAddress | cyan | bold }}{{ else }}{{ "> " | red | bold }}{{ .Name | red | bold }}{{ " | " | red | bold }}{{ .ComputerName | red | bold }}{{ " | " | red | bold }}{{ .InstanceID | red | bold }}{{ " | " | red | bold }}{{ .PrivateIPAddress | red | bold }}{{ end }}`,
 		Inactive: `  {{ if eq .AgentState "Online" }}{{ .Name }}{{ " | " }}{{ .ComputerName }}{{ " | " }}{{ .InstanceID }}{{ " | " }}{{ .PrivateIPAddress }}{{ else }}{{ .Name | red }}{{ " | "  | red }}{{ .ComputerName | red }}{{ " | " | red}}{{ .InstanceID | red }}{{ " | " | red }}{{ .PrivateIPAddress | red }}{{ end }}`,
 		Details: `
-{{ "PublicIP: " }}{{ .PublicIPAddress }}{{ " | PlatformType: " }}{{ .PlatformType }}{{ " | PlatformName: " }}{{ .PlatformName }}{{ " | Agent: "}}{{ .AgentState }}{{ " | State: "}}{{ .InstanceState }}`,
+{{ "PublicIP: " }}{{ .PublicIPAddress }}{{ " | PlatformType: " }}{{ .PlatformType }}{{ " | PlatformName: " }}{{ .PlatformName }}{{ " | Agent: "}}{{ if eq .AgentState "Online" }}{{ .AgentState | bgGreen }}{{ else }}{{ .AgentState | bgRed }}{{ end }}{{ " | State: "}}{{ .InstanceState }}`,
 	}
 
 	searcher := func(input string, index int) bool {
@@ -263,9 +268,13 @@ func selectInstance(managedInstances []instance) string {
 	return managedInstances[selected].InstanceID
 }
 
-func startSSH(InstanceID string, region, profile *string, sess *session.Session) {
+func startSSH(instanceID string, region, profile, portNumber, localPortNumber *string, source, destination string, sess *session.Session) {
 	client := ssm.New(sess)
-	input := &ssm.StartSessionInput{Target: aws.String(InstanceID)}
+	input := &ssm.StartSessionInput{Target: aws.String(instanceID)}
+	if *portNumber != "" && *localPortNumber != "" && source == "" {
+		input.DocumentName = aws.String("AWS-StartPortForwardingSession")
+		input.Parameters = map[string][]*string{"portNumber": []*string{aws.String(*portNumber)}, "localPortNumber": []*string{aws.String(*localPortNumber)}}
+	}
 
 	ssmSess, err := client.StartSession(input)
 	if err != nil {
