@@ -280,9 +280,10 @@ func startSSH(instanceID string, region, profile, portNumber, localPortNumber *s
 	if err != nil {
 		log.Fatal(err.Error())
 	}
-	json, _ := json.Marshal(ssmSess)
+	payloadJSON, _ := json.Marshal(ssmSess)
+	inputJSON, _ := json.Marshal(input)
 
-	cmd := exec.Command("session-manager-plugin", string(json), *region, "StartSession", *profile)
+	cmd := exec.Command("session-manager-plugin", string(payloadJSON), *region, "StartSession", *profile, string(inputJSON))
 	cmd.Stdout = os.Stdout
 	cmd.Stdin = os.Stdin
 	cmd.Stderr = os.Stderr
