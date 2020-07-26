@@ -40,7 +40,7 @@ var managedInstances []instance
 
 func main() {
 	profile := flag.String("p", "", "Profile from ~/.aws/config")
-	region := flag.String("r", "eu-west-1", "Region, default is eu-west-1")
+	region := flag.String("r", "", "Region, default is eu-west-1")
 	instance := flag.String("i", "", "InstanceID for direct connection")
 	portNumber := flag.String("pn", "", "Port Number for Proxy")
 	localPortNumber := flag.String("lpn", "", "Local Port Number for Proxy")
@@ -60,9 +60,14 @@ func main() {
 			*profile = selectProfile(p)
 		}
 	}
-
-	if reg, present := os.LookupEnv("AWS_DEFAULT_REGION"); *region == "" && present == true {
-		*region = reg
+	if *region == "" {
+		if os.Getenv("AWS_REGION") != "" {
+			*region = os.Getenv("AWS_REGION")
+		} else if os.Getenv("AWS_DEFAULT_REGION") != "" {
+			*region = os.Getenv("AWS_DEFAULT_PROFILE")
+		} else {
+			*region = "eu-west-1"
+		}
 	}
 
 	// Create session (credentials from ~/.aws/config)
