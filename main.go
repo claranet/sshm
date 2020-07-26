@@ -62,7 +62,7 @@ func main() {
 	}
 	if *region == "" {
 		if os.Getenv("AWS_REGION") != "" {
-			*region = os.Getenv("AWS_PROFILE")
+			*region = os.Getenv("AWS_REGION")
 		} else if os.Getenv("AWS_DEFAULT_REGION") != "" {
 			*region = os.Getenv("AWS_DEFAULT_PROFILE")
 		} else {
