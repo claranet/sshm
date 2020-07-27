@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
+	"fmt"
 	"log"
 	"os"
 	"regexp"
@@ -60,23 +61,31 @@ func main() {
 			*profile = selectProfile(p)
 		}
 	}
-	if *region == "" {
-		if os.Getenv("AWS_REGION") != "" {
-			*region = os.Getenv("AWS_REGION")
-		} else if os.Getenv("AWS_DEFAULT_REGION") != "" {
-			*region = os.Getenv("AWS_DEFAULT_PROFILE")
-		} else {
-			*region = "eu-west-1"
-		}
-	}
 
 	// Create session (credentials from ~/.aws/config)
 	sess := session.Must(session.NewSessionWithOptions(session.Options{
 		SharedConfigState:       session.SharedConfigEnable,  //enable use of ~/.aws/config
 		AssumeRoleTokenProvider: stscreds.StdinTokenProvider, //ask for MFA if needed
 		Profile:                 string(*profile),
-		Config:                  aws.Config{Region: aws.String(*region)},
+		// Config:                  aws.Config{Region: aws.String(*region)},
 	}))
+
+R:
+	switch {
+	case *region != "":
+		sess.Config.Region = aws.String(*region)
+	case os.Getenv("AWS_REGION") != "":
+		sess.Config.Region = aws.String(os.Getenv("AWS_REGION"))
+	case os.Getenv("AWS_DEFAULT_REGION") != "":
+		sess.Config.Region = aws.String(os.Getenv("AWS_DEFAULT_REGION"))
+	case *sess.Config.Region != "":
+		break R
+	default:
+		sess.Config.Region = aws.String("eu-west-1")
+	}
+
+	fmt.Println(*sess.Config.Region)
+	os.Exit(0)
 
 	if *instance != "" {
 		startSSH(*instance, region, profile, portNumber, localPortNumber, source, destination, sess)

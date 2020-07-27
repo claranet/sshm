@@ -1,0 +1,4 @@
+fe120ec1502c02a1cf1b14989c40176dffaba226e32f38886e1b817ad11c2042  sshm_1.2.1_Linux_i386.tar.gz
+6fe0a6e1ce32bbb750446a54ec4e4c1522e4bc1af764eac276d0a5327f3ef24d  sshm_1.2.1_Linux_x86_64.tar.gz
+509fb2a4e7df20c369d984581cf4cde753a5c54aaed94b6e9a5cf8775767acdf  sshm_1.2.1_Darwin_x86_64.tar.gz
+bf8e072508d34fde28eda11b533e3c6bd1730402d3044cebd989ec36513f71a3  sshm_1.2.1_Darwin_i386.tar.gz
