@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"encoding/json"
 	"flag"
-	"fmt"
 	"log"
 	"os"
 	"regexp"
@@ -83,9 +82,6 @@ R:
 	default:
 		sess.Config.Region = aws.String("eu-west-1")
 	}
-
-	fmt.Println(*sess.Config.Region)
-	os.Exit(0)
 
 	if *instance != "" {
 		startSSH(*instance, region, profile, portNumber, localPortNumber, source, destination, sess)
